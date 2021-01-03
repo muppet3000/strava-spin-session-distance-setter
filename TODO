@@ -1,0 +1,9 @@
+The script that I've written so far is very hacky and not a long term solution.
+
+Instead, write a script that uses the REST API: https://medium.com/analytics-vidhya/accessing-user-data-via-the-strava-api-using-stravalib-d5bee7fdde17
+
+The script should find any activity with a particular type of name e.g. Contains "Spinning" (case insensitive)
+
+Then it should check that it currently has no distance set and then modify it accordingly.
+
+This may need the same level of "hack" that was required for the XML one e.g. modify every heartbeat info rather than just setting a distance
