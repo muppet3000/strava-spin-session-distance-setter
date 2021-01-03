@@ -6,12 +6,14 @@ import sys
 filename=sys.argv[1]
 distance=sys.argv[2]
 
-#sys.exit(0)
-
 orignal_name = filename + '.tcx'
 ET.register_namespace('', "http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2")
 tree = ET.parse(orignal_name)
 root = tree.getroot()
+
+
+for activity in tree.iter("{http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2}Activity"):
+  activity.set("Sport", "Ride")
 
 track_points = tree.iter("{http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2}Trackpoint")
 num_track_points = 0
