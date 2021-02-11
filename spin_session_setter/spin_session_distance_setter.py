@@ -96,6 +96,8 @@ def getspinbikeid(logger):
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logging.getLogger("stravalib").setLevel(logging.ERROR) #Suppress warnings & info from the stravalib library - it's overly sensitive
 logger = logging.getLogger("spin_session_setter")
+file_handler = logging.FileHandler("{}/spin-setter.log".format(STRAVA_DATA_DIR))
+logger.addHandler(file_handler)
 
 parser = argparse.ArgumentParser(description="Updates Strava Spinning Sessions with metadata and distance. IMPORTANT - The title of the activity must contain a distance and the word 'spinning' e.g. 'Early morning spinning session - 23km'")
 parser.add_argument('--generate-auth-token', dest='generate_auth_token', help='Generates an authorization token for future use.', action='store_true')

@@ -88,3 +88,7 @@ Your credentials are protected in transit to/from the Strava site. However, loca
 At the time of implementing it was concluded that users would run this from a personal device and would be happy to take the risk. If you do not want to use this method, then you can run the acript in interactive mode by choosing not to use the `--use-creds-file` argument, as such you will be prompted for credentials each time and they will not persist anywhere.
 
 Also - I take no responsibility for the script trashing your Strava data, the script will download any data that it modifies from Strava prior to deleting it, so you always have a local copy to re-upload if things go wrong. I'm confident enough to use it with my own data, but that's as far as I'm placing any guarantee on it.
+
+## Issues and Stuff
+If you find a bug or have a suggestion for more functionality head on over to the github and log a ticket. I can't promise I'll fix/add it, this is just a bit of a side-project for me but if I get the chance I'll add it in. 
+PRs are always welcome!
