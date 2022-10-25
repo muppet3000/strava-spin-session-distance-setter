@@ -61,8 +61,8 @@ def getcredsfromfile(logger):
   return email_addr, user_pass
 
 def getusergear(logger, stravaclient):
-  logger.info("Strava isn't very helpul at providing us with a list of all gear, so we scrape it from the last 100 activities. If you're looking for your spinning bike, ensure one of the last 100 activities uses it")
-  activities = client.get_activities(limit=100)
+  logger.info("Strava isn't very helpul at providing us with a list of all gear, so we scrape it from the last 365 days. If you're looking for your spinning bike, ensure one of the activities in the last 365 uses it")
+  activities = client.get_activities(after=(datetime.datetime.today() - datetime.timedelta(days=365)))
   unique_gear_ids = []
   for activity in activities:
     unique_gear_ids.append(activity.gear_id)
@@ -106,7 +106,7 @@ parser.add_argument('--use-creds-file', dest='use_creds_file', help='Whether or 
 parser.add_argument('--username', dest='username', help='The username (email address) of the user we are targetting. OPTIONAL - Will be read from file if --use-creds-file is specified, otherwise will prompt', default="")
 parser.add_argument('--password', dest='user_pass', help='The password of the user we are targetting. OPTIONAL - Will be read from file if --use-creds-file is specified, otherwise will prompt', default="")
 
-parser.add_argument('--num-activities-to-update', type=int, dest='num_activities_to_update', help='The number of activities to update. OPTIONAL - Defaults to 10', default=10)
+parser.add_argument('--days-activities-to-update', type=int, dest='num_days_activities_to_update', help='The number of days worth of activities to update. OPTIONAL - Defaults to 10', default=10)
 
 parser.add_argument('--list-gear', dest='list_gear', help='Outputs all gear registered to the user from the last 100 activities.', action='store_true')
 parser.add_argument('--interactive-configure-spin-bike-gear-id', dest='interactive_configure_spin_bike_gear_id', help='OPTIONAL - Performs interactive configuration of spin bike gear id', action='store_true')
@@ -225,15 +225,15 @@ ORIGINAL_FILE_PATH = STRAVA_DATA_DIR + "/original_files"
 if not os.path.exists(ORIGINAL_FILE_PATH):
   os.makedirs(ORIGINAL_FILE_PATH)
 
-NUMBER_OF_ACTIVITIES_TO_UPDATE=args.num_activities_to_update
+NUMBER_OF_DAYS_OF_ACTIVITIES_TO_UPDATE=args.num_days_activities_to_update
 
 logger.info("")
-logger.info("** Updating spin sessions with distances (most recent {} activites) **".format(NUMBER_OF_ACTIVITIES_TO_UPDATE))
+logger.info("** Updating spin sessions with distances (most recent {} days of activites) **".format(NUMBER_OF_DAYS_OF_ACTIVITIES_TO_UPDATE))
 
 # Update any Spin sessions that have no distance
-activities = client.get_activities(limit=NUMBER_OF_ACTIVITIES_TO_UPDATE)
+activities = client.get_activities(after=(datetime.datetime.today() - datetime.timedelta(days=NUMBER_OF_DAYS_OF_ACTIVITIES_TO_UPDATE)))
 for activity in activities:
-  logger.debug("Id: {}, Name: {}, Distance: {}, Gear: {}".format(activity.id, activity.name, activity.distance, activity.gear_id))
+  logger.debug("Date: {}, Id: {}, Name: {}, Distance: {}, Gear: {}".format(activity.start_date, activity.id, activity.name, activity.distance, activity.gear_id))
 
   #Only perform operations if the name of the activity contains "spinning"
   if ("spinning" in activity.name.lower()):
@@ -298,11 +298,11 @@ for activity in activities:
         except OSError as e:
           logger.error("File tidy up failed")
           raise e
-logger.info("** Updating spin sessions with distances (most recent {} activites) - COMPLETE **".format(NUMBER_OF_ACTIVITIES_TO_UPDATE))
+logger.info("** Updating spin sessions with distances (most recent {} days of activites) - COMPLETE **".format(NUMBER_OF_DAYS_OF_ACTIVITIES_TO_UPDATE))
 
 logger.info("")
 logger.info("** Updating spin sessions with correct metadata e.g. bike/gear **")
-activities = client.get_activities(limit=NUMBER_OF_ACTIVITIES_TO_UPDATE)
+activities = client.get_activities(after=(datetime.datetime.today() - datetime.timedelta(days=NUMBER_OF_DAYS_OF_ACTIVITIES_TO_UPDATE)))
 for activity in activities:
   logger.debug("Id: {}, Name: {}, Distance: {}, Gear: {}".format(activity.id, activity.name, activity.distance, activity.gear_id))
   #Only perform operations if the name of the activity contains "spinning"

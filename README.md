@@ -18,7 +18,7 @@ https://github.com/pR0Ps/stravaweblib
 (Note - we use them both because the weblib provides certain functionality that is unavailable through the standard REST API)
 
 ## Under-the-hood
-The script works by authenticating as an "app" and then downloading any existing activities (number of activities is configurable) that do not currently have distances logged. Deleting them from strava. Then modifying the downloaded item and re-uploading it as a new activity.
+The script works by authenticating as an "app" and then downloading any existing activities (number of days of activities is configurable) that do not currently have distances logged. Deleting them from strava. Then modifying the downloaded item and re-uploading it as a new activity.
 
 ## Usage
 The scripts are all published as a docker image [here](https://hub.docker.com/repository/docker/muppet3000/spin-session-setter)
@@ -33,7 +33,7 @@ All options are available by running the `--help` option
 ```
 $# sudo docker run -v ${PWD}/strava_data:/opt/strava_data muppet3000/spin-session-setter --help
 
-usage: spin_session_distance_setter.py [-h] [--generate-auth-token] [--use-creds-file] [--username USERNAME] [--password USER_PASS] [--num-activities-to-update NUM_ACTIVITIES_TO_UPDATE] [--list-gear] [--interactive-configure-spin-bike-gear-id] [--set-spin-bike-gear-id]
+usage: spin_session_distance_setter.py [-h] [--generate-auth-token] [--use-creds-file] [--username USERNAME] [--password USER_PASS] [--num-days-activities-to-update NUM_ACTIVITIES_TO_UPDATE] [--list-gear] [--interactive-configure-spin-bike-gear-id] [--set-spin-bike-gear-id]
                                        [--spin-bike-gear-id SPIN_BIKE_GEAR_ID]
 
 Updates Strava Spinning Sessions with metadata and distance. IMPORTANT - The title of the activity must contain a distance and the word 'spinning' e.g. 'Early morning spinning session - 23km'
@@ -45,8 +45,8 @@ optional arguments:
   --use-creds-file      Whether or not a file should be used to store credentials (defaults to False). OPTIONAL. NOTE this is in plaintext, if you do not have any credentials stored in a file it will use those passed in, or prompt for you to enter them
   --username USERNAME   The username (email address) of the user we are targetting. OPTIONAL - Will be read from file if --use-creds-file is specified, otherwise will prompt
   --password USER_PASS  The password of the user we are targetting. OPTIONAL - Will be read from file if --use-creds-file is specified, otherwise will prompt
-  --num-activities-to-update NUM_ACTIVITIES_TO_UPDATE
-                        The number of activities to update. OPTIONAL - Defaults to 10
+  --days-activities-to-update DAYS_ACTIVITIES_TO_UPDATE
+                        The number of days of activities to update. OPTIONAL - Defaults to 10
   --list-gear           Outputs all gear registered to the user from the last 100 activities.
   --interactive-configure-spin-bike-gear-id
                         OPTIONAL - Performs interactive configuration of spin bike gear id
