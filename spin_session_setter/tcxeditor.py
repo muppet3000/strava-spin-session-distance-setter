@@ -29,9 +29,11 @@ def add_distance(filename, distance_in_metres, output_filename=""):
 
   #Get the start time
   start_datetime_obj = None
+  xml_starttime_value = ""
   laps = tree.iter("{http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2}Lap")
   for lap in laps:
     start_datetime_obj = datetime.strptime(lap.get("StartTime"), datetime_string_format)
+    xml_starttime_value = lap.get("StartTime")
 
   #Sum the number of points we have & get the final timestamp
   track_points = tree.iter("{http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2}Trackpoint")
@@ -55,12 +57,17 @@ def add_distance(filename, distance_in_metres, output_filename=""):
   average_speed_metres_per_second = float(distance_in_metres) / float(total_time_in_seconds)
   logger.debug("Average speed in m/s: {}".format(average_speed_metres_per_second))
 
+  starting_bpm = None
   previous_datetime = start_datetime_obj
   current_distance = 0.0
   loop_count = 0
   #Loop over the tracking points one by one and add a new distance element (this is a cumulative total)
   for tp in tree.iter("{http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2}Trackpoint"):
     loop_count += 1
+
+    if loop_count == 1:
+      hrbpm = tp.find("{http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2}HeartRateBpm")
+      starting_bpm = hrbpm.find("{http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2}Value").text
 
     timestamp = tp.find("{http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2}Time").text
     current_timestamp_obj = datetime.strptime(timestamp, datetime_string_format)
@@ -80,6 +87,19 @@ def add_distance(filename, distance_in_metres, output_filename=""):
         temp.text = str(int(distance_in_metres))
 
     previous_datetime = current_timestamp_obj
+
+  #Now add the zeroth element (start time, with a distance of zero)
+  tp0 = ET.Element('{http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2}Trackpoint')
+  tp0_timepoint = ET.SubElement(tp0, '{http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2}Time')
+  tp0_timepoint.text = xml_starttime_value
+  tp0_hrbpm = ET.SubElement(tp0, '{http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2}HeartRateBpm')
+  tp0_hrbpm_value = ET.SubElement(tp0_hrbpm, '{http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2}Value')
+  tp0_hrbpm_value.text = starting_bpm
+  tp0_distance = ET.SubElement(tp0, '{http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2}DistanceMeters')
+  tp0_distance.text = '0'
+  
+  track = tree.find('{http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2}/Track')
+  track.insert(0, tp0)
 
   #Output the file with a new name
   if (output_filename == ""):
