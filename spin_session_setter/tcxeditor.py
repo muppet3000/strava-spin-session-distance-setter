@@ -77,7 +77,7 @@ def add_distance(filename, distance_in_metres, output_filename=""):
 
       #If we're the last point in the list then we set the total distance (prevents any distance rounding errors)
       if loop_count == num_track_points:
-        temp.text = str(int(distance_in_metres+40)) # Randomly we need to add an extra 40 metres because Strava likes to round down for some unknown reason
+        temp.text = str(int(distance_in_metres))
 
     previous_datetime = current_timestamp_obj
 
