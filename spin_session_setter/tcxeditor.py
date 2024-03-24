@@ -15,7 +15,9 @@ def add_distance(filename, distance_in_metres, output_filename=""):
     f.truncate()
 
   #Stops the full namespace being output into the final file
-  ET.register_namespace('', "http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2")
+  namespace = 'http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2'
+  ns = {'d': namespace}
+  ET.register_namespace('', namespace)
 
   #Open & parse the file
   tree = ET.parse(filename)
@@ -41,7 +43,7 @@ def add_distance(filename, distance_in_metres, output_filename=""):
   num_track_points = 0
   for tp in track_points:
     num_track_points += 1
-    final_datetime_point = tp.find("{http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2}Time").text
+    final_datetime_point = tp.find("d:Time", ns).text
     final_datetime_obj = datetime.strptime(final_datetime_point, datetime_string_format)
 
   #Total duration - This seems to be completely independent from the trackpoints and completely throws out our distance calculations - so we overwrite it!
@@ -66,10 +68,10 @@ def add_distance(filename, distance_in_metres, output_filename=""):
     loop_count += 1
 
     if loop_count == 1:
-      hrbpm = tp.find("{http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2}HeartRateBpm")
-      starting_bpm = hrbpm.find("{http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2}Value").text
+      hrbpm = tp.find("d:HeartRateBpm", ns)
+      starting_bpm = hrbpm.find("d:Value", ns).text
 
-    timestamp = tp.find("{http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2}Time").text
+    timestamp = tp.find("d:Time", ns).text
     current_timestamp_obj = datetime.strptime(timestamp, datetime_string_format)
     time_since_last_reading = current_timestamp_obj - previous_datetime
     seconds_since_last_reading = time_since_last_reading.total_seconds()
@@ -97,13 +99,18 @@ def add_distance(filename, distance_in_metres, output_filename=""):
   tp0_hrbpm_value.text = starting_bpm
   tp0_distance = ET.SubElement(tp0, '{http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2}DistanceMeters')
   tp0_distance.text = '0'
-  
-  track = tree.find('{http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2}/Track')
+
+  track = tree.find('d:Activities', ns) \
+              .find('d:Activity', ns) \
+              .find('d:Lap', ns) \
+              .find('d:Track', ns)
   track.insert(0, tp0)
 
   #Output the file with a new name
   if (output_filename == ""):
     output_filename = filename.replace(".tcx","_modified.tcx")
+
+  ET.indent(tree)
 
   tree.write(output_filename)
 
