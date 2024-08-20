@@ -10,9 +10,9 @@ import datetime
 import logging
 import argparse
 import sys
-from units import unit
 
 from stravalib.client import Client
+from stravalib import unit_helper
 from stravaweblib import WebClient, DataFormat
 
 STRAVA_DATA_DIR="/opt/strava_data"
@@ -158,13 +158,13 @@ if (args.generate_auth_token):
   authenticator.create_authentication_token()
   sys.exit(0)
 
-web_client = WebClient(email=email_addr, password=user_pass)
-
-client = Client()
+#Use the stravalib client to generate a new token if needed
+stravalib_client = Client()
 MY_STRAVA_CLIENT_ID = ""
 MY_STRAVA_CLIENT_SECRET = ""
 try:
-  MY_STRAVA_CLIENT_ID, MY_STRAVA_CLIENT_SECRET = open(STRAVA_DATA_DIR + '/client.secret').read().strip().split(',')
+  with open(STRAVA_DATA_DIR + '/client.secret') as f:
+    MY_STRAVA_CLIENT_ID, MY_STRAVA_CLIENT_SECRET = f.read().strip().split(',')
 except FileNotFoundError as e:
   logger.error("client.secret file not found. Please run with the --generate-auth-token to generate it")
   sys.exit(1)
@@ -178,28 +178,69 @@ logger.debug('Latest access token read from file: {0}'.format(access_token))
 
 if time.time() > access_token['expires_at']:
     logger.info('Token has expired, will refresh')
-    refresh_response = client.refresh_access_token(client_id=MY_STRAVA_CLIENT_ID, client_secret=MY_STRAVA_CLIENT_SECRET, refresh_token=access_token['refresh_token'])
+    refresh_response = stravalib_client.refresh_access_token(client_id=MY_STRAVA_CLIENT_ID, client_secret=MY_STRAVA_CLIENT_SECRET, refresh_token=access_token['refresh_token'])
     access_token = refresh_response
     with open(STRAVA_DATA_DIR + '/access_token.pickle', 'wb') as f:
         pickle.dump(refresh_response, f)
     logger.debug('Refreshed token saved to file')
-    client.access_token = refresh_response['access_token']
-    client.refresh_token = refresh_response['refresh_token']
-    client.token_expires_at = refresh_response['expires_at']
+    stravalib_client.access_token = refresh_response['access_token']
+    stravalib_client.refresh_token = refresh_response['refresh_token']
+    stravalib_client.token_expires_at = refresh_response['expires_at']
 else:
     logger.debug('Token still valid, expires at {}'
           .format(time.strftime("%a, %d %b %Y %H:%M:%S %Z", time.localtime(access_token['expires_at']))))
-    client.access_token = access_token['access_token']
-    client.refresh_token = access_token['refresh_token']
-    client.token_expires_at = access_token['expires_at']
+    stravalib_client.access_token = access_token['access_token']
+    stravalib_client.refresh_token = access_token['refresh_token']
+    stravalib_client.token_expires_at = access_token['expires_at']
+
+
+#Use the token from above with the webclient library
+generate_jwt_session = False
+web_client = None
+jwt = None
+#See if we have an existing JWT in a pickle file and load it
+try:
+    with open(STRAVA_DATA_DIR + '/access_jwt.pickle', 'rb') as f:
+        jwt = pickle.load(f)
+    logger.debug("JWT loaded from file")
+except FileNotFoundError as e:
+    logger.info("No JWT file found")
+
+#If we have a JWT, start a session using it
+if jwt != None:
+    try:
+        logger.info("Generating web client with JWT from file")
+        web_client = WebClient(access_token=stravalib_client.access_token, jwt=jwt)
+    except ValueError:
+        jwt = None
+        web_client = None
+        logger.info("JWT token has expired, need to generate a new one")
+
+#If there is no valid JWT, start a login based session to get one
+if jwt == None:
+    logger.info("Logging in with username and password to generate JWT")
+    web_client = WebClient(access_token=stravalib_client.access_token, email=email_addr, password=user_pass)
+    jwt = web_client.jwt
+    with open(STRAVA_DATA_DIR + '/access_jwt.pickle', 'wb') as f:
+        pickle.dump(jwt, f)
+    generate_jwt_session = True
+
+#If we need to re-generate a session do it with the JWT
+if generate_jwt_session:
+    logger.info("Generating new web client with JWT from current session")
+    web_client = WebClient(access_token=stravalib_client.access_token, jwt=jwt)
+
+
+
+#Main logic (post-authentication) starts here
 
 #Start getting some data
-athlete = client.get_athlete()
+athlete = web_client.get_athlete()
 logger.info("Athlete's name is {} {}, based in {}, {}"
               .format(athlete.firstname, athlete.lastname, athlete.city, athlete.country))
 
 if (args.list_gear):
-  getusergear(logger, client)
+  getusergear(logger, web_client)
   sys.exit(0)
 
 #Use the value that has been passed in
@@ -207,7 +248,7 @@ spin_bike_id=args.spin_bike_gear_id
 
 if (args.interactive_configure_spin_bike_gear_id):
   logger.info("Interactive Spin Bike Config")
-  getusergear(logger, client)
+  getusergear(logger, web_client)
   spin_bike_id = input("Please input 'Gear ID' of Spinning Bike:")
 
 if (args.set_spin_bike_gear_id):
@@ -231,14 +272,13 @@ logger.info("")
 logger.info("** Updating spin sessions with distances (most recent {} days of activites) **".format(NUMBER_OF_DAYS_OF_ACTIVITIES_TO_UPDATE))
 
 # Update any Spin sessions that have no distance
-activities = client.get_activities(after=(datetime.datetime.today() - datetime.timedelta(days=NUMBER_OF_DAYS_OF_ACTIVITIES_TO_UPDATE)))
+activities = web_client.get_activities(after=(datetime.datetime.today() - datetime.timedelta(days=NUMBER_OF_DAYS_OF_ACTIVITIES_TO_UPDATE)))
 for activity in activities:
   logger.debug("Date: {}, Id: {}, Name: {}, Distance: {}, Gear: {}".format(activity.start_date, activity.id, activity.name, activity.distance, activity.gear_id))
 
   #Only perform operations if the name of the activity contains "spinning"
   if ("spinning" in activity.name.lower()):
-    metre = unit('m')
-    if (activity.distance == metre(0)):
+    if (unit_helper.meters(activity.distance).magnitude == 0.0):
       logger.debug("No distance set")
 
       #Calculate the distance in metres
@@ -256,7 +296,6 @@ for activity in activities:
       #Only update the distance if we've found a distance to update to (i.e. 22km has been added to the name of the activity)
       if(distance_in_metres != 0):
         logger.info("Updating Activity: '{}' ({}) (id: {}) with - Distance in metres: {}".format(activity.name, activity.start_date.date(), activity.id, distance_in_metres))
-
         logger.info("Downloading activity for modification...")
         data = web_client.get_activity_data(activity.id, fmt=DataFormat.ORIGINAL)
 
@@ -277,32 +316,25 @@ for activity in activities:
         logger.info("Deleting activity (so we can upload it's replacement): {}".format(activity.id))
         web_client.delete_activity(activity.id) #We have to use the webclient for this one
         # Upload the new version + modify accordingly
-        time.sleep(4) #Tiny sleep needed here for the deletion to register
+        time.sleep(10) #Tiny sleep needed here for the deletion to register
         logger.info("Uploading activity: {}".format(output_file))
         with open(output_file, 'r+') as f:
-          uploader = client.upload_activity(f, "tcx", activity.name, "", "ride")
+          uploader = web_client.upload_activity(f, "tcx", activity.name, "", "ride")
           new_activity_id = uploader.wait()
           logger.info("Upload complete")
-
-        # Move the original download to a sub-folder (just in case)
+        
         # Delete the modified tcx file
-        #backups_path = "./strava_backups"
         try:
-        #  #Make the backups directory if it doesn't exist
-        #  if not os.path.exists(backups_path):
-        #    os.mkdir(backups_path)
-        #  #Move the original file into the backups dir
-        #  os.rename(filename, backups_path + "/" + filename)
-        #  #Remove the new, modified file
           os.remove(output_file)
         except OSError as e:
           logger.error("File tidy up failed")
           raise e
+
 logger.info("** Updating spin sessions with distances (most recent {} days of activites) - COMPLETE **".format(NUMBER_OF_DAYS_OF_ACTIVITIES_TO_UPDATE))
 
 logger.info("")
 logger.info("** Updating spin sessions with correct metadata e.g. bike/gear **")
-activities = client.get_activities(after=(datetime.datetime.today() - datetime.timedelta(days=NUMBER_OF_DAYS_OF_ACTIVITIES_TO_UPDATE)))
+activities = web_client.get_activities(after=(datetime.datetime.today() - datetime.timedelta(days=NUMBER_OF_DAYS_OF_ACTIVITIES_TO_UPDATE)))
 for activity in activities:
   logger.debug("Id: {}, Name: {}, Distance: {}, Gear: {}".format(activity.id, activity.name, activity.distance, activity.gear_id))
   #Only perform operations if the name of the activity contains "spinning"
@@ -313,7 +345,7 @@ for activity in activities:
     #Correct the Bike used - If the user wants to & has provided the gear id
     if (args.set_spin_bike_gear_id and spin_bike_id != "" and activity.gear_id != spin_bike_id):
       logger.info("Incorrect bike ID ({}), correcting to: {}".format(activity.gear_id, spin_bike_id))
-      client.update_activity(activity.id, gear_id=spin_bike_id)
+      web_client.update_activity(activity.id, gear_id=spin_bike_id)
       activity_modified = True
 
     if (activity_modified):
