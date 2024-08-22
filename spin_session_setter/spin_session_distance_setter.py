@@ -93,10 +93,12 @@ def getspinbikeid(logger):
 
   return spin_bike_id
 
-logging.basicConfig(level=logging.INFO, format="%(message)s")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 logging.getLogger("stravalib").setLevel(logging.ERROR) #Suppress warnings & info from the stravalib library - it's overly sensitive
 logger = logging.getLogger("spin_session_setter")
+formatter = logging.Formatter("%(asctime)s - %(message)s", "%Y-%m-%d %H:%M:%S")
 file_handler = logging.FileHandler("{}/spin-setter.log".format(STRAVA_DATA_DIR))
+file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 
 parser = argparse.ArgumentParser(description="Updates Strava Spinning Sessions with metadata and distance. IMPORTANT - The title of the activity must contain a distance and the word 'spinning' e.g. 'Early morning spinning session - 23km'")
