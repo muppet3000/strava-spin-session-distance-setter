@@ -202,11 +202,13 @@ web_client = None
 jwt = None
 #See if we have an existing JWT in a pickle file and load it
 try:
-    with open(STRAVA_DATA_DIR + '/access_jwt.pickle', 'rb') as f:
-        jwt = pickle.load(f)
+    with open(STRAVA_DATA_DIR + '/access_jwt.txt', 'r') as f:
+        jwt = str(f.read().rstrip())
     logger.debug("JWT loaded from file")
 except FileNotFoundError as e:
     logger.info("No JWT file found")
+
+logger.debug("JWT from file: {}".format(jwt))
 
 #If we have a JWT, start a session using it
 if jwt != None:
@@ -223,8 +225,8 @@ if jwt == None:
     logger.info("Logging in with username and password to generate JWT")
     web_client = WebClient(access_token=stravalib_client.access_token, email=email_addr, password=user_pass)
     jwt = web_client.jwt
-    with open(STRAVA_DATA_DIR + '/access_jwt.pickle', 'wb') as f:
-        pickle.dump(jwt, f)
+    with open(STRAVA_DATA_DIR + '/access_jwt.txt', 'w') as f:
+        f.write(jwt)
     generate_jwt_session = True
 
 #If we need to re-generate a session do it with the JWT
@@ -322,7 +324,7 @@ for activity in activities:
         logger.info("Uploading activity: {}".format(output_file))
         with open(output_file, 'r+') as f:
           uploader = web_client.upload_activity(f, "tcx", activity.name, "", "ride")
-          new_activity_id = uploader.wait()
+          new_activity_id = uploader.wait(100)
           logger.info("Upload complete")
         
         # Delete the modified tcx file
